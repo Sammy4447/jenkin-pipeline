@@ -59,26 +59,31 @@ sudo dnf update -y          # Amazon Linux 2023
 
 ## 5. Install Java
 
-Jenkins requires Java 17 or 21.
+Current Jenkins releases (2.500+) require **Java 21 or 25**. Java 17 will install fine but Jenkins
+will refuse to start with `older than the minimum required version (Java 21)`.
 
 **Amazon Linux 2023:**
 
 ```bash
-sudo dnf install -y java-17-amazon-corretto-devel
+sudo dnf install -y java-21-amazon-corretto-devel
 ```
 
 **Amazon Linux 2:**
 
 ```bash
-sudo amazon-linux-extras install java-openjdk11 -y   # older Jenkins only
-# Preferred: install Corretto 17
-sudo yum install -y java-17-amazon-corretto-devel
+sudo yum install -y java-21-amazon-corretto-devel
 ```
 
-Verify:
+Verify — it must report `21.x`:
 
 ```bash
 java -version
+```
+
+If an older JDK is also installed, make 21 the default:
+
+```bash
+sudo alternatives --config java
 ```
 
 ---
@@ -200,8 +205,35 @@ Key paths:
 - Confirm it's listening: `sudo ss -tlnp | grep 8080`.
 
 **Service fails to start**
-- Check Java: `java -version` (must be 17 or 21).
-- Read the failure: `sudo journalctl -u jenkins -n 50 --no-pager`.
+- Read the failure first: `sudo journalctl -xeu jenkins.service --no-pager | tail -40`.
+- Check Java: `java -version` — must be **21** (or 25).
+
+**`Running with Java 17 ... older than the minimum required version (Java 21)`**
+
+Install Corretto 21 and make it the default:
+
+```bash
+sudo dnf install -y java-21-amazon-corretto-devel
+sudo alternatives --config java     # select the java-21 entry
+java -version
+sudo systemctl restart jenkins
+```
+
+If the system default must stay on another JDK, pin Java only for Jenkins:
+
+```bash
+sudo systemctl edit jenkins
+```
+
+```ini
+[Service]
+Environment="JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto"
+Environment="JENKINS_JAVA_CMD=/usr/lib/jvm/java-21-amazon-corretto/bin/java"
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl restart jenkins
+```
 
 **Out of memory / builds hang**
 - Upgrade the instance type; `t2.micro` is not enough for Jenkins.
